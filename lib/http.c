@@ -1212,7 +1212,7 @@ CURLcode Curl_buffer_send(struct dynbuf *in,
                              counter */
                           curl_off_t *bytes_written,
                           /* how much of the buffer contains body data */
-                          size_t included_body_bytes,
+                          curl_off_t included_body_bytes,
                           int socketindex)
 {
   ssize_t amount;
@@ -1238,7 +1238,7 @@ CURLcode Curl_buffer_send(struct dynbuf *in,
   headersize = size - included_body_bytes; /* the initial part that isn't body
                                               is header */
 
-  DEBUGASSERT(size > included_body_bytes);
+  DEBUGASSERT(size > (size_t)included_body_bytes);
 
   result = Curl_convert_to_network(data, ptr, headersize);
   /* Curl_convert_to_network calls failf if unsuccessful */
@@ -1262,9 +1262,15 @@ CURLcode Curl_buffer_send(struct dynbuf *in,
 
     sendsize = CURLMIN(size, CURL_MAX_WRITE_SIZE);
 
+    /* Make sure this doesn't send more body bytes than what the max send
+       speed says. The request bytes do not count to the max speed.
+    */
     if(data->set.max_send_speed &&
-       (sendsize > (size_t)data->set.max_send_speed))
-      sendsize = (size_t)data->set.max_send_speed;
+       (included_body_bytes > data->set.max_send_speed)) {
+      curl_off_t overflow = included_body_bytes - data->set.max_send_speed;
+      DEBUGASSERT((size_t)overflow < sendsize);
+      sendsize -= overflow;
+    }
 
     /* OpenSSL is very picky and we must send the SAME buffer pointer to the
        library when we attempt to re-send this buffer. Sending the same data
@@ -1297,8 +1303,15 @@ CURLcode Curl_buffer_send(struct dynbuf *in,
     else
 #endif
     {
-      if(data->set.max_send_speed)
-        sendsize = CURLMIN(size, (size_t)data->set.max_send_speed);
+      /* Make sure this doesn't send more body bytes than what the max send
+         speed says. The request bytes do not count to the max speed.
+      */
+      if(data->set.max_send_speed &&
+         (included_body_bytes > data->set.max_send_speed)) {
+        curl_off_t overflow = included_body_bytes - data->set.max_send_speed;
+        DEBUGASSERT((size_t)overflow < size);
+        sendsize = size - overflow;
+      }
       else
         sendsize = size;
     }
@@ -2643,8 +2656,8 @@ CURLcode Curl_http_bodysend(struct Curl_easy *data, struct connectdata *conn,
       }
     }
     /* issue the request */
-    result = Curl_buffer_send(r, data, &data->info.request_size,
-                              (size_t)included_body, FIRSTSOCKET);
+    result = Curl_buffer_send(r, data, &data->info.request_size, included_body,
+                              FIRSTSOCKET);
 
     if(result)
       failf(data, "Failed sending HTTP POST request");
