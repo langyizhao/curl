@@ -1261,15 +1261,18 @@ CURLcode Curl_buffer_send(struct dynbuf *in,
        (included_body_bytes > data->set.max_send_speed)) {
       curl_off_t overflow = included_body_bytes - data->set.max_send_speed;
       DEBUGASSERT((size_t)overflow < size);
-      size -= overflow;
+      sendsize = size - overflow;
     }
+    else
+      sendsize = size;
 
     /* We never send more than CURL_MAX_WRITE_SIZE bytes in one single chunk
        when we speak HTTPS, as if only a fraction of it is sent now, this data
        needs to fit into the normal read-callback buffer later on and that
        buffer is using this size.
     */
-    sendsize = CURLMIN(size, CURL_MAX_WRITE_SIZE);
+    if(sendsize > CURL_MAX_WRITE_SIZE)
+      sendsize = CURL_MAX_WRITE_SIZE;
 
     /* OpenSSL is very picky and we must send the SAME buffer pointer to the
        library when we attempt to re-send this buffer. Sending the same data
