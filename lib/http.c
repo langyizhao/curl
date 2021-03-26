@@ -1167,7 +1167,12 @@ static size_t readmoredata(char *buffer,
   /* make sure that a HTTP request is never sent away chunked! */
   data->req.forbidchunk = (http->sending == HTTPSEND_REQUEST)?TRUE:FALSE;
 
-  if(http->postsize <= (curl_off_t)fullsize) {
+  if((data->set.max_send_speed > 0) &&
+     (data->set.max_send_speed < http->postsize))
+    /* speed limit */
+    fullsize = data->set.max_send_speed;
+
+  else if(http->postsize <= (curl_off_t)fullsize) {
     memcpy(buffer, http->postdata, (size_t)http->postsize);
     fullsize = (size_t)http->postsize;
 
@@ -1287,7 +1292,12 @@ CURLcode Curl_buffer_send(struct dynbuf *in,
     }
     else
 #endif
-    sendsize = size;
+    {
+      if(data->set.max_send_speed > 0)
+        sendsize = CURLMIN(size, (size_t)data->set.max_send_speed);
+      else
+        sendsize = size;
+    }
   }
 
   result = Curl_write(data, sockfd, ptr, sendsize, &amount);
