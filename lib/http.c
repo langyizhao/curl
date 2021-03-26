@@ -1170,7 +1170,7 @@ static size_t readmoredata(char *buffer,
   if(data->set.max_send_speed &&
      (data->set.max_send_speed < http->postsize))
     /* speed limit */
-    fullsize = data->set.max_send_speed;
+    fullsize = (size_t)data->set.max_send_speed;
 
   else if(http->postsize <= (curl_off_t)fullsize) {
     memcpy(buffer, http->postdata, (size_t)http->postsize);
@@ -1264,7 +1264,7 @@ CURLcode Curl_buffer_send(struct dynbuf *in,
 
     if(data->set.max_send_speed &&
        (sendsize > (size_t)data->set.max_send_speed))
-      sendsize = data->set.max_send_speed;
+      sendsize = (size_t)data->set.max_send_speed;
 
     /* OpenSSL is very picky and we must send the SAME buffer pointer to the
        library when we attempt to re-send this buffer. Sending the same data
