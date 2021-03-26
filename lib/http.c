@@ -1262,6 +1262,10 @@ CURLcode Curl_buffer_send(struct dynbuf *in,
 
     sendsize = CURLMIN(size, CURL_MAX_WRITE_SIZE);
 
+    if(data->set.max_send_speed &&
+       (sendsize > (size_t)data->set.max_send_speed))
+      sendsize = data->set.max_send_speed;
+
     /* OpenSSL is very picky and we must send the SAME buffer pointer to the
        library when we attempt to re-send this buffer. Sending the same data
        is not enough, we must use the exact same address. For this reason, we
